@@ -3,8 +3,9 @@ from fastapi import FastAPI, HTTPException, Depends, Request, Body
 from typing import List
 
 from models import FindJobRequest, AddJobRequest, EditJobRequest, DelJobRequest, AnalyticsRequest
-from h3_services import H3RedisWorker
+from h3_redis import H3RedisWorker
 from bandit_master import BanditMaster, StatsKeeper
+from simple_security import verify_user
 
 from fastapi_utils.tasks import repeat_every
 
@@ -58,12 +59,12 @@ async def rec_feed(lat:float, lng:float, Depends = None):
     ordered_job_ids = nearby_jobs_df.sort_values(by = feed_col).index #this sorts the jobs by the feed column `.index` returns job_id
     ##TO CHECK LATER: THAT INDEX OF AD_STATS matches job_id
     
-    return {'rec_feed' = ordered_job_ids} # on main api, need to use this to preserve the feed order. https://stackoverflow.com/a/36664472
+    return {'rec_feed': ordered_job_ids} # on main api, need to use this to preserve the feed order. https://stackoverflow.com/a/36664472
 
 @app.post("/submit_analytics")
 async def receive_analytics(analytics_data: dict = Body(...)):
 #async def receive_analytics(analytics_req : AnalyticsRequest):
-    analytics_backlog.append(analytics_data)
+    bandit_master.stats_keeper.analytics_backlog.append(analytics_data)
     return {"mesage": "Received"}
 
 

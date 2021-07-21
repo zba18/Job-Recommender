@@ -1,4 +1,5 @@
 from collections import defaultdict
+import time
 import sqlite3
 import json
 import itertools
@@ -13,10 +14,12 @@ class BanditMaster:
     def __init__(self, stats_keeper):
         self.stats_keeper = stats_keeper
         #defaults - blank
-        self.feed_stats_dict = {'feeds': { ## rename this?
-            0:{'impressions':0, 'applies':0, 'view':0, 'save':0}
-            2:{'impressions':0, 'applies':0, 'view':0, 'save':0}
-            3:{'impressions':0, 'applies':0, 'view':0, 'save':0}    
+        self.feed_stats_dict = {'feeds':  ## rename this?
+            {
+            0:{'impressions':0, 'applies':0, 'view':0, 'save':0},
+            1:{'impressions':0, 'applies':0, 'view':0, 'save':0},
+            2:{'impressions':0, 'applies':0, 'view':0, 'save':0},
+            3:{'impressions':0, 'applies':0, 'view':0, 'save':0},   
             },
             'latest_records':
                 {'saves':0, 'applies':0, 'hires':0}
@@ -27,7 +30,6 @@ class BanditMaster:
         
         self.load_bandit_master_from_db()
         self.generate_feed_decisions()
-        Im here throhg rreviewing end to
         
 
    #redundant function atm.     
@@ -42,8 +44,10 @@ class BanditMaster:
 
     def load_bandit_master_from_db(self):
         #get latest json containing state of feed_stats_dict 
-        state_json = self.local_db.execute('SELECT state_json FROM feed_stats WHERE id = (SELECT MAX(id) FROM feed_stats);').fetchone() # The table has to have an id prmary key
-        self.feed_stats_dict = json.loads(state_json)
+        state_json = self.stats_keeper.local_db.execute('SELECT vals FROM feed_stats WHERE id = (SELECT MAX(id) FROM feed_stats);').fetchone() # The table has to have an id prmary key
+        if state_json:
+            self.feed_stats_dict = json.loads(state_json)
+
         
 
     def save_bandit_master_to_db(self):
@@ -58,16 +62,22 @@ class BanditMaster:
         alphas = [] # one set of (alpha, beta) for each feed. these are for Thompson sampling. 
         betas = []
         
-        for key, val in self.feed_stats_dict:
+        for key, val in self.feed_stats_dict['feeds'].items():
             self.keys2feed_names.append(key)
             im, ap = val['impressions'], val['applies']
             alphas.append(ap + 1) #successes + 1
             betas.append(im-ap + 1) #fails + 1
             
-        beta_samples = np.random.beta(alphas, betas, size = 500)
-        optimal_feed = np.argmax(beta_samples, axis = 0)
-        self.feed_decisions_list = list(optimal_feed)
-        feed_decisions_generator = itertools.repeat(self.feed_decisions_list)
+        
+        if not alphas:
+            self.feed_decisions_list = list(range(len(self.keys2feed_names)))
+        else:
+            
+            beta_samples = np.random.beta(alphas, betas, size = (500, len(alphas)))
+            optimal_feed = np.argmax(beta_samples, axis = 0)
+            self.feed_decisions_list = list(optimal_feed)
+
+        self.feed_decisions_generator = itertools.repeat(self.feed_decisions_list)
         
         
     #THIS FUNCTION IS IN BANDIT MASTER AS OPPOSED TO STATS KEEPER BECAUSE WE NEED FEED_STATS_DICT 
@@ -163,7 +173,7 @@ class StatsKeeper:
             print('using simulated behaviors data from fake_main_behaviors_new')
             self.remote_db_con = sqlite3.connect('fake_main_behaviors_new.db')
                 
-        self.check_tables_exist()
+        #self.check_tables_exist()
         self.load_ad_stats_from_db() # populates self.ad_stats_df
         self.analytics_backlog = [] 
 
@@ -181,8 +191,7 @@ class StatsKeeper:
         
     def save_ad_stats_to_db(self):
         self.ad_stats_df.to_sql('ad_stats',self.local_db, index=False, if_exists = 'replace')
-        
-        
+                
         pass # backups? how?
 
     def recompute_derived_stats(self):
