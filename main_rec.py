@@ -50,17 +50,18 @@ def run_background_tasks():
 
 # rec feed
 
-@app.get("/request_rec_feed")
-async def rec_feed(lat:float, lng:float, Depends = None):
-    nearby_job_list = h3worker.find_jobs((lat,lng))
+@app.post("/request_rec_feed")
+async def rec_feed(fjr : FindJobRequest):
+    nearby_job_list = h3worker.find_jobs((fjr.lat, fjr.lng))
     nearby_jobs_df = stats_keeper.ad_stats_df.loc[nearby_job_list]
 
-    chosen_feed_num = next(bandit_master.feed_decision_generator)
+    chosen_feed_num = next(bandit_master.feed_decisions_generator)
+    print(chosen_feed_num)
 
     #need to have a list here that maps column names (Clickthrough, apply/impression, etc)   
     feed_col = bandit_master.keys2feed_names[chosen_feed_num] 
     
-    ordered_job_ids = nearby_jobs_df.sort_values(by = feed_col).index #this sorts the jobs by the feed column `.index` returns job_id
+    ordered_job_ids = nearby_jobs_df.sort_values(by = feed_col).index.to_list() #this sorts the jobs by the feed column `.index` returns job_id
     ##TO CHECK LATER: THAT INDEX OF AD_STATS matches job_id
     
     return {'rec_feed': ordered_job_ids} # on main api, need to use this to preserve the feed order. https://stackoverflow.com/a/36664472
@@ -71,8 +72,6 @@ async def receive_analytics(analytics_data: dict = Body(...)):
     bandit_master.stats_keeper.analytics_backlog.append(analytics_data)
     print(bandit_master.stats_keeper.analytics_backlog)
     return {"mesage": "Received"}
-
-
 
 @app.post("/add_job", status_code = 201) # 201 created
 async def add_job_service( ajr : AddJobRequest, authorized: bool = Depends(verify_user)):
