@@ -2,6 +2,8 @@ import redis
 from fastapi import FastAPI, HTTPException, Depends, Request, Body
 from typing import List
 
+import logging
+
 from models import FindJobRequest, AddJobRequest, EditJobRequest, DelJobRequest, AnalyticsRequest
 from h3_redis import H3RedisWorker
 from bandit_master import BanditMaster, StatsKeeper
@@ -23,6 +25,7 @@ redis_con = redis.Redis('localhost') # make sure this is running, port default i
 h3worker = H3RedisWorker(redis_con)
 stats_keeper = StatsKeeper(local_db) # add main_api_db later. by default, uses 'fake_main_behaviors.db' file locally.
 bandit_master = BanditMaster(stats_keeper)
+
 '''
 @app.on_event("startup")
 def load_resources_for_startup():
@@ -35,12 +38,13 @@ def load_resources_for_startup():
     #stats keeper
     load_ad_stats_from_db()
 '''
-        
+
 @app.on_event("startup")
-@repeat_every(seconds=60 * 5, wait_first=True)  # 5 minutes
+@repeat_every(seconds= 5, wait_first=True)  # 5 minutes
 def run_background_tasks():
     bandit_master.process_analytics()
     
+
     
 ### ENDPOINTS 
 
@@ -54,7 +58,7 @@ async def rec_feed(lat:float, lng:float, Depends = None):
     chosen_feed_num = next(bandit_master.feed_decision_generator)
 
     #need to have a list here that maps column names (Clickthrough, apply/impression, etc)   
-    feed_col = feed_num_to_column[chosen_feed_num] 
+    feed_col = bandit_master.keys2feed_names[chosen_feed_num] 
     
     ordered_job_ids = nearby_jobs_df.sort_values(by = feed_col).index #this sorts the jobs by the feed column `.index` returns job_id
     ##TO CHECK LATER: THAT INDEX OF AD_STATS matches job_id
@@ -65,6 +69,7 @@ async def rec_feed(lat:float, lng:float, Depends = None):
 async def receive_analytics(analytics_data: dict = Body(...)):
 #async def receive_analytics(analytics_req : AnalyticsRequest):
     bandit_master.stats_keeper.analytics_backlog.append(analytics_data)
+    print(bandit_master.stats_keeper.analytics_backlog)
     return {"mesage": "Received"}
 
 

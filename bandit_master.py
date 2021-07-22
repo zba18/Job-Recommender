@@ -6,6 +6,10 @@ import itertools
 import pandas as pd
 import numpy as np
 
+import sqlalchemy
+from sqlalchemy.sql import text
+
+
 class BanditMaster:
 
     #$TO DO: DESIGNATE FEED 0 TO BE ALL FEED SOMEHOW?
@@ -89,6 +93,9 @@ class BanditMaster:
         '''
 
         #First, ingest the data
+        print('Analytics processing...')
+
+        print(1)
         impressions = defaultdict(int)
         applies = defaultdict(int)
         views = defaultdict(int)
@@ -98,8 +105,8 @@ class BanditMaster:
         feed_apps = defaultdict(int)
 
         for session_dict in self.stats_keeper.analytics_backlog: # check this this is the correct shape that is injested.
-            for feed in session_dict['feeds']:
-                for job_id in feed['impressions']:
+            for feed_name, feed_dict in session_dict['feeds'].items():
+                for job_id in feed_dict['impressions']:
                     impressions[job_id] += 1
 
     #            for job_id in session['apply']:
@@ -111,29 +118,73 @@ class BanditMaster:
     #            for job_id in session['save']:
     #                saves[job_id] += 1
 
-                self.feed_stats_dict[feed['feed']]['impressions'] += len(feed['impressions'])
-                self.feed_stats_dict[feed['feed']]['view'] += -len(feed['view'])
-                self.feed_stats_dict[feed['feed']]['save'] += len(feed['save'])
-                self.feed_stats_dict[feed['feed']]['apply'] += len(feed['apply'])
+                self.feed_stats_dict[feed_dict['feed']]['impressions'] += len(feed_dict['impressions'])
+                self.feed_stats_dict[feed_dict['feed']]['view'] += len(feed_dict['view'])
+                self.feed_stats_dict[feed_dict['feed']]['save'] += len(feed_dict['save'])
+                self.feed_stats_dict[feed_dict['feed']]['apply'] += len(feed_dict['apply'])
                 
+        print(2)
         
         impressions_df = pd.DataFrame([impressions]).transpose()
-        self.stats_keeper.ad_stats['impressions'] = self.stats_keeper.ad_stats['impressions'].add(impressions_df, fill_value = 0)
+        print(2.5)
+        print(self.stats_keeper.ad_stats_df is None)
+        print(self.stats_keeper.ad_stats_df['impressions'])
+        self.stats_keeper.ad_stats_df['impressions'] = self.stats_keeper.ad_stats_df['impressions'].add(impressions_df, fill_value = 0)
+        print(2.6)
         # To prevent constantly downloading the multiple tables entirely, keep track of the latest IDS. 
-        latest_retrieved_behaviors = self.feed_dict_stats.get('latest_records', []) 
+        latest_retrieved_behaviors = self.feed_stats_dict.get('latest_records', []) 
+        print(latest_retrieved_behaviors)
+        print(2.7)
+        # try:
+            
+        # except Exception as e:
+        #     print(e)
+        
+
         if latest_retrieved_behaviors:
             #one latest_record_id for each table: saves, applies, hires.
             s, a, h = latest_retrieved_behaviors['saves'], latest_retrieved_behaviors['applies'], latest_retrieved_behaviors['hires']
+            print(3)
+            
+            queries = {
+                'saves': text('SELECT user_id, gig_advertisement_id FROM gig_application_saves WHERE created_at > :latest').bindparams(latest= s ), #should be gig_advertisement_saves in maindb
+                'applies': text('SELECT user_id, gig_advertisement_id FROM gig_applications WHERE created_at > :latest').bindparams(latest= a ),
+                'hires': text('SELECT user_id, gig_advertisement_id FROM gig_hires WHERE created_at > :latest').bindparams(latest= h ), 
+            }
 
-            saves_df = pd.read_sql_query(f'SELECT id, user_id, gig_advertisement_id FROM gig_advertisement_saves WHERE created_at > {s}', self.remote_db_con, index_col='id') # this needs to be safer
-            applies_df = pd.read_sql_query(f'SELECT id, user_id, gig_advertisement_id FROM gig_applications WHERE created_at > {a}', self.remote_db_con, index_col='id') ## f'SELECT * FROM gig_applications WHERE id > {a}'
-            hires_df = pd.read_sql_query(f'SELECT id, user_id, gig_advertisement_id FROM gig_hires WHERE created_at > {h}', self.remote_db_con, index_col='id')
+            try:
+
+                saves_df = pd.read_sql_query(queries['saves'], self.stats_keeper.remote_db_con,
+                # index_col='id' #dummy table has no id column, will automatically be added by pd. Otherwise, this line is needed
+                ) 
+                applies_df = pd.read_sql_query(queries['applies'], self.stats_keeper.remote_db_con,
+                # index_col='id'
+                ) 
+                hires_df = pd.read_sql_query(queries['hires'], self.stats_keeper.remote_db_con, 
+                #index_col='id'
+                )
+            except Exception as e:
+                print(e)
+
+            # for main db, modify this to WHERE id > {a}
+            
+
         else:
-            saves_df = pd.read_sql_query(f'SELECT * FROM gig_saves', self.remote_db_con, index_col='id') # this needs to be safer
-            applies_df = pd.read_sql_query(f'SELECT * FROM gig_applications', self.remote_db_con, index_col='id')
-            hires_df = pd.read_sql_query(f'SELECT * FROM gig_hires', self.remote_db_con, index_col='id')
+            print('else')
+            saves_df = pd.read_sql_query('SELECT * FROM gig_saves;', self.stats_keeper.remote_db_con, 
+            #index_col='id'
+            )
+            applies_df = pd.read_sql_query('SELECT * FROM gig_applications;', self.stats_keeper.remote_db_con, 
+            #index_col='id'
+            )
+            hires_df = pd.read_sql_query('SELECT * FROM gig_hires;', self.stats_keeper.remote_db_con, 
+            #index_col='id'
+            )
         
-        self.feed_dict_stats = {'saves': saves_df.index[-1],'applies': applies_df.index[-1],'hires': hires_df.index[-1]}
+        print(4)
+
+        #update latest records
+        self.feed_stats_dict['latest_records'] = {'saves': saves_df.index[-1],'applies': applies_df.index[-1],'hires': hires_df.index[-1]}
         
         
         saves_counts_df = saves_df.pivot_table(index='employer_id',values='user_id', aggfunc='count',)#.sort_values(by='user_id')
@@ -141,22 +192,25 @@ class BanditMaster:
         hires_counts_df = hires_df.pivot_table(index='employer_id',values='user_id', aggfunc='count',)#.sort_values(by='user_id')
         
         # viewcount is a column in main db so it needs to be accessed directly
-        view_counts_df = pd.read_sql_query('SELECT id, view_count FROM `gig_advertisements`', self.remote_db_con, index_col='id')
+        view_counts_df = pd.read_sql_query('SELECT gig_advertisement_id, view_count FROM gig_advertisements', self.stats_keeper.remote_db_con, index_col='gig_advertisement_id')
+        print(5)
         
-        
-        #merge data into ad_stats
-        self.stats_keeper.ad_stats['impressions'] = self.stats_keeper.ad_stats['impressions'].add(impressions_df, fill_value = 0)        
-        self.stats_keeper.ad_stats['saves'] = self.stats_keeper.ad_stats['saves'].add(saves_counts_df, fill_value = 0)
-        self.stats_keeper.ad_stats['applies'] = self.stats_keeper.ad_stats['applies'].add(applies_counts_df, fill_value = 0)
-        self.stats_keeper.ad_stats['hires'] = self.stats_keeper.ad_stats['hires'].add(hires_counts_df, fill_value = 0)
-        
-        self.stats_keeper.ad_stats['views'] = view_counts_df ##  align by index first??!!!
-        
+        #merge data into ad_stats_df
+        self.stats_keeper.ad_stats_df['impressions'] = self.stats_keeper.ad_stats_df['impressions'].add(impressions_df, fill_value = 0)        
+        self.stats_keeper.ad_stats_df['saves'] = self.stats_keeper.ad_stats_df['saves'].add(saves_counts_df, fill_value = 0)
+        self.stats_keeper.ad_stats_df['applies'] = self.stats_keeper.ad_stats_df['applies'].add(applies_counts_df, fill_value = 0)
+        self.stats_keeper.ad_stats_df['hires'] = self.stats_keeper.ad_stats_df['hires'].add(hires_counts_df, fill_value = 0)
+        print(6)
+
+        self.stats_keeper.ad_stats_df['views'] = view_counts_df ##  align by index first??!!!
+        print(7)
         self.stats_keeper.recompute_derived_stats()
-        
-        
+                
         self.stats_keeper.save_ad_stats_to_db()
         self.save_bandit_master_to_db()
+
+        self.stats_keeper.analytics_backlog = []
+        print('Analytics processed.')
         
         
         
@@ -165,17 +219,20 @@ class BanditMaster:
                 
 class StatsKeeper:
         
-    def __init__(self, local_db_path = 'analytics.db', remote_db_con = 'fake_main_behaviors_new.db' ):
+    def __init__(self, local_db_path = 'analytics.db', remote_db_eng = 'fake_main_behaviors_new.db' ):
         self.local_db_path = local_db_path
-        self.local_db = sqlite3.connect(self.local_db_path)  # backups?
-        self.remote_db_con = remote_db_con
-        if remote_db_con == 'fake_main_behaviors_new.db':
+        self.local_db = sqlalchemy.create_engine(f"sqlite:///{self.local_db_path}")  # backups?
+        
+        if remote_db_eng == 'fake_main_behaviors_new.db':
             print('using simulated behaviors data from fake_main_behaviors_new')
-            self.remote_db_con = sqlite3.connect('fake_main_behaviors_new.db')
-                
+            self.remote_db_con = sqlalchemy.create_engine(f"sqlite:///fake_main_behaviors_new.db")
+        else:
+            self.remote_db_con = remote_db_eng       
+        
         #self.check_tables_exist()
         self.load_ad_stats_from_db() # populates self.ad_stats_df
         self.analytics_backlog = [] 
+        
 
     def check_tables_exist(self):
         if self.local_db.execute("""SELECT name FROM sqlite_master WHERE type='table' AND name='ad_stats';""").fetchone():
