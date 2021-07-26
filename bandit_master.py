@@ -18,6 +18,7 @@ class BanditMaster:
         #defaults - blank
         self.bandit_master_state = {'feeds':  ## rename this?
             {
+            'all':{'impressions':0, 'applies':0, 'views':0, 'saves':0},
             'click/impression':{'impressions':0, 'applies':0, 'views':0, 'saves':0},
             'applies/impression':{'impressions':0, 'applies':0, 'views':0, 'saves':0},
             'hired/applied':{'impressions':0, 'applies':0, 'views':0, 'saves':0},
@@ -26,7 +27,7 @@ class BanditMaster:
             'latest_records':
                 {'saves':0, 'applies':0, 'hires':0}
             }
-        
+        print(json.dumps(self.bandit_master_state))
         self.feed_decisions_list = []
         self.feed_decisions_generator = None
         
@@ -93,6 +94,7 @@ class BanditMaster:
             # we track impressions (only), since views, saves, and applies are stored in the main behavior tables.
             # this is also only an approx. because impression tracking is currently only on app AFAIK.
             impressions = defaultdict(int) 
+            print(self.bandit_master_state)
 
             for session_dict in self.stats_keeper.analytics_backlog: # check this this is the correct shape that is injested.
                 for feed_name, feed_dict in session_dict['feeds'].items():
@@ -163,7 +165,7 @@ class BanditMaster:
             
             print(self.stats_keeper.ad_stats_df)
             print(self.bandit_master_state)
-            #make sure this all works first
+
             if not self.demo:
                 self.stats_keeper.save_ad_stats_to_db() 
                 self.save_bandit_master_to_db()
@@ -229,9 +231,3 @@ class StatsKeeper:
         
         self.ad_stats_df = stats_df
         
-        
-        
-
-        
-        
-
