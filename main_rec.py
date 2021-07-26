@@ -63,6 +63,7 @@ async def rec_feed(fjr : FindJobRequest):
     feed_col = bandit_master.keys2feed_names[chosen_feed_num] 
     
     ordered_job_ids = nearby_jobs_df.sort_values(by = feed_col).index.to_list() #this sorts the jobs by the feed column `.index` returns job_id
+    print(nearby_jobs_df.sort_values(by = feed_col, ascending=False))
     ##TO CHECK LATER: THAT INDEX OF AD_STATS matches job_id
     
     return {'rec_feed': ordered_job_ids} # on main api, need to use this to preserve the feed order. https://stackoverflow.com/a/36664472
