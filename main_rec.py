@@ -12,6 +12,7 @@ from simple_security import verify_user
 from fastapi_utils.tasks import repeat_every
 
 
+
 app = FastAPI()
 
 local_db = 'analytics.db' 
