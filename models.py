@@ -4,6 +4,7 @@ from typing import Optional, List
 class FindJobRequest(BaseModel):
     lat: float
     lng: float
+    radius: float
         
 class AddJobRequest(BaseModel):
     id_: int 

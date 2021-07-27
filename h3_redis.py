@@ -7,14 +7,15 @@ class H3RedisWorker:
         hash_ = h3.geo_to_h3(*coords, self.resolution)
         return self.r.append(hash_, f'{id_} ')# add a space after to separate atomically
 
-    def find_jobs(self, coords, radius = 5):
-        ## RADIUS CALC for later
+    def find_jobs(self, coords, radius = None):
         
-        #   const radius = Math.floor(searchRadiusKm / (h3.edgeLength(res, h3.UNITS.km) * 2));   edgelengh is 1.221 km for res 7 
-        #return h3.kRing(origin, radius);
+        hex_radius = int(radius/2.442) if radius else 2
+        
+        #const radius = Math.floor(searchRadiusKm / (h3.edgeLength(res, h3.UNITS.km) * 2));   edgelengh is 1.221 km for res 7 
+        #return h3.kRing(origin, radius); https://observablehq.com/@nrabinowitz/h3-radius-lookup?collection=@nrabinowitz/h3-tutorial
         
         hash_ = h3.geo_to_h3(*coords, self.resolution)
-        str_list = self.r.mget( h3.k_ring(hash_, 3) ) #redis always returns bytes 
+        str_list = self.r.mget( h3.k_ring(hash_, hex_radius ) ) #redis always returns bytes 
         ids = b''.join( (x for x in str_list if x ) ).split(b' ') # join if not None, then split by space
         ids = [int(x) for x in ids if x!= b'']
         return ids

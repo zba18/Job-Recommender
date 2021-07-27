@@ -72,7 +72,7 @@ async def rec_feed(fjr : FindJobRequest):
 async def receive_analytics(analytics_data: dict = Body(...)):
 #async def receive_analytics(analytics_req : AnalyticsRequest):
     bandit_master.stats_keeper.analytics_backlog.append(analytics_data)
-    print(bandit_master.stats_keeper.analytics_backlog)
+#    print(bandit_master.stats_keeper.analytics_backlog)
     return {"mesage": "Received"}
 
 @app.post("/add_job", status_code = 201) # 201 created
@@ -82,7 +82,7 @@ async def add_job_service( ajr : AddJobRequest, authorized: bool = Depends(verif
 
 @app.post("/find_jobs")
 async def find_job_service(fjr : FindJobRequest, authorized: bool = Depends(verify_user)):
-    resp = h3worker.find_jobs((fjr.lat,fjr.lng))
+    resp = h3worker.find_jobs((fjr.lat,fjr.lng), fjr.radius)
     return {"job_ids": resp}
 
 @app.post("/edit_job")
@@ -99,7 +99,4 @@ async def del_job_service(djr : DelJobRequest, authorized: bool = Depends(verify
 async def home(authorized: bool = Depends(verify_user)):
      if authorized:
         return {"detail": "Authorised"}
-
-
-    
 

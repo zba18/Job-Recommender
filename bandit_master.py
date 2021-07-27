@@ -27,7 +27,6 @@ class BanditMaster:
             'latest_records':
                 {'saves':0, 'applies':0, 'hires':0}
             }
-        print(json.dumps(self.bandit_master_state))
         self.feed_decisions_list = []
         self.feed_decisions_generator = None
         
