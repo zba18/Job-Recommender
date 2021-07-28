@@ -49,7 +49,7 @@ class BanditMaster:
             self.bandit_master_state = json.loads(state_json[0]) 
             print(self.bandit_master_state)
 
-    def save_bandit_master_to_db(self):
+    def save_state_to_db(self):
         state_json = json.dumps(self.bandit_master_state)
         self.stats_keeper.local_db.execute('insert into feed_stats(time,vals) values (?,?)',(time.time_ns()), state_json)
         
@@ -89,25 +89,28 @@ class BanditMaster:
             print('Analytics processing...')
             if not self.stats_keeper.analytics_backlog:
                 print('Empty backlog')
-                return
+                
             # we track impressions (only), since views, saves, and applies are stored in the main behavior tables.
             # this is also only an approx. because impression tracking is currently only on app AFAIK.
-            impressions = defaultdict(int) 
-            print(self.bandit_master_state)
+            else:
+                impressions = defaultdict(int) 
+                print(self.bandit_master_state)
 
-            for session_dict in self.stats_keeper.analytics_backlog: # check this this is the correct shape that is injested.
-                for feed_name, feed_dict in session_dict['feeds'].items():
-                    for job_id in feed_dict['impressions']:
-                        impressions[job_id] += 1
+                for session_dict in self.stats_keeper.analytics_backlog: # check this this is the correct shape that is injested.
+                    for feed_name, feed_dict in session_dict['feeds'].items():
+                        for job_id in feed_dict['impressions']:
+                            impressions[job_id] += 1
 
-                    self.bandit_master_state['feeds'][feed_name]['impressions'] += len(feed_dict['impressions'])
-                    self.bandit_master_state['feeds'][feed_name]['views'] += len(feed_dict['views'])
-                    self.bandit_master_state['feeds'][feed_name]['saves'] += len(feed_dict['saves'])
-                    self.bandit_master_state['feeds'][feed_name]['applies'] += len(feed_dict['applies'])
-                    
-            print(self.bandit_master_state)
+                        self.bandit_master_state['feeds'][feed_name]['impressions'] += len(feed_dict['impressions'])
+                        self.bandit_master_state['feeds'][feed_name]['views'] += len(feed_dict['views'])
+                        self.bandit_master_state['feeds'][feed_name]['saves'] += len(feed_dict['saves'])
+                        self.bandit_master_state['feeds'][feed_name]['applies'] += len(feed_dict['applies'])
+                        
+                print(self.bandit_master_state)
 
-            impressions_df = pd.Series(impressions)
+                impressions_df = pd.Series(impressions)
+
+            # Now check remote db for changes.
             # To prevent constantly downloading the multiple tables entirely, keep track of the latest IDS. 
             latest_retrieved_behaviors = self.bandit_master_state.get('latest_records', []) 
                     
@@ -167,7 +170,7 @@ class BanditMaster:
 
             if not self.demo:
                 self.stats_keeper.save_ad_stats_to_db() 
-                self.save_bandit_master_to_db()
+                self.save_state_to_db()
 
             self.stats_keeper.analytics_backlog = []
             print('Analytics processed.')
@@ -176,8 +179,7 @@ class BanditMaster:
         except Exception as e:
             print(traceback.format_exc())
             raise e
-
-        
+       
         
                 
 class StatsKeeper:
