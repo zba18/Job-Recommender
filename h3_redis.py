@@ -15,11 +15,11 @@ class H3RedisWorker:
         #return h3.kRing(origin, radius); https://observablehq.com/@nrabinowitz/h3-radius-lookup?collection=@nrabinowitz/h3-tutorial
 
         if radius: # high res.
-            hex_radius = 3 #int(radius/ (2*0.174375668) )
+            hex_radius = int(radius/ (2*0.174375668))
             hash_ = h3.geo_to_h3(*coords, self.hi_res)
 
         else: # no radius supplied; approx 5km for rec_feed 
-            hex_radius = int(radius/ (2*1.220629759))        
+            hex_radius = 3 # int(radius/ (2*1.220629759))        
             hash_ = h3.geo_to_h3(*coords, self.resolution)
         
         str_list = self.r.mget( h3.k_ring(hash_, hex_radius ) ) #redis always returns bytes 
