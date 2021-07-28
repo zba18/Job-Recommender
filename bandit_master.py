@@ -33,7 +33,7 @@ class BanditMaster:
         self.load_bandit_master_from_db()
         self.generate_feed_decisions()
         
-    #redundant function atm - ignore  
+    #redundant function atm - ignore 
     def init_db_connections(self):
         self.local_db = sqlite3.connect('analytics.db')    # backups?
         #self.main_api_db = ''

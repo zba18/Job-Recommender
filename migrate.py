@@ -12,11 +12,11 @@ import os
 
 ## connect to all DBs
 
+# Connection to localhost redis
 redis_con = redis.Redis('localhost', port= 6379) # make sure this is running, port default is 6379
 h3worker = H3RedisWorker(redis_con)
 
 # Connection to main db
-
 db_url = ''
 db_port = 3306
 username = ''
@@ -31,6 +31,9 @@ stats_keeper = StatsKeeper(
     )
 
 bandit_master = BanditMaster(stats_keeper)
+
+
+
 
 # Clear all
 
@@ -55,9 +58,11 @@ if ad_stats_exists and feed_stats_exists:
 else:
     raise FileNotFoundError 
 
-#Populate data
 
-#populate ad_stats
+
+# Populate data
+
+# Begin by downloading data to populate ad_stats
 saves_df = pd.read_sql_query('SELECT * FROM gig_saves;', stats_keeper.remote_db_con, )
 applies_df = pd.read_sql_query('SELECT * FROM gig_applications;', stats_keeper.remote_db_con, )
 hires_df = pd.read_sql_query('SELECT * FROM gig_hires;', stats_keeper.remote_db_con, )
@@ -74,15 +79,19 @@ saves_counts_df = saves_df.pivot_table(index='gig_advertisement_id',values='user
 applies_counts_df = applies_df.pivot_table(index='gig_advertisement_id',values='user_id', aggfunc='count',) 
 hires_counts_df = hires_df.pivot_table(index='gig_advertisement_id',values='user_id', aggfunc='count',)
 
-# viewcount is a column in main db so it needs to be accessed directly 
 view_counts_df = pd.read_sql_query('SELECT id, view_count FROM gig_advertisements',  stats_keeper.remote_db_con, index_col='id') # in main, change id to gig_advertisement_id
 
-## all data is now downloaded. Proceed to update the table
+ads_lat_lng_df = pd.read_sql_query('SELECT id, latitude, longitude, FROM gig_advertisements',  stats_keeper.remote_db_con) 
 
-# Add views column first, this will ensure all new ads are present in ad_stats_df
+## all data is now downloaded. Proceed to populate the tables
+
+# populate redis.
+ads_lat_lng_df.apply(lambda row: h3worker.add_job( row['id'], (row['latitude'], row['longitude']) ) ) # will probaly fail if coords are null.
+
+#merge data combined above into ad_stats_df
+stats_keeper.ad_stats_df = pd.DataFrame()
+# Add views column first, this will ensure all ads are present in ad_stats_df
 stats_keeper.ad_stats_df['views'] = view_counts_df['view_count'] 
-
-#merge data into ad_stats_df
 stats_keeper.ad_stats_df['impressions'] =  0
 stats_keeper.ad_stats_df['saves'] =  saves_counts_df['user_id'].astype(np.int32)
 stats_keeper.ad_stats_df['applies'] = applies_counts_df['user_id'].astype(np.int32)
@@ -95,12 +104,10 @@ stats_keeper.save_ad_stats_to_db()
 
 #populate feed_stats
 ## Start from scratch.
-feed_names = ['all', 'view/impression', 'applies/impression','hired/applied'] # NOTE these should be linked to ad_stats columns as they are used as sort keys.
-initialized_feed_stats = { feed_name: {'impressions':0, 'applies':0, 'views':0, 'saves':0} for feed_name in feed_names }
+feed_names = ['all', 'view/impression', 'applies/impression','hired/applied'] # NOTE these should be linked to ad_stats columns as they are used as sort keys. Add them in stats_keeper.recompute_derived_stats()
+initialized_feed_stats = { feed: {'impressions':0, 'applies':0, 'views':0, 'saves':0} for feed in feed_names }
 
 initialized_state = {'feeds': initialized_feed_stats , 'latest_records': latest_records }
 bandit_master.save_state_to_db()
 
-# populate redis.
-ads_lat_lng_df = pd.read_sql_query('SELECT id, latitude, longitude, FROM gig_advertisements',  stats_keeper.remote_db_con)
-ads_lat_lng_df.apply(lambda row: h3worker.add_job( row['id'], (row['latitude'], row['longitude']) ) ) # will probaly fail if coords are null.
+print("\nMigration Successful\n\n")
