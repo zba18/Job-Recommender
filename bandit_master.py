@@ -227,8 +227,8 @@ class StatsKeeper:
         
         stats_df['click/impression'] = stats_df['views']/stats_df['impressions'] #click through rate
         stats_df['applies/impression'] = stats_df['applies']/stats_df['impressions'] # application rate
-        stats_df['hired/applied'] = stats_df['applies']/stats_df['impressions'] # acceptentance rate (don't miss out!)
-        stats_df['neg_hired/applied'] = -stats_df['hired/applied'] # reverse acceptance rate (be the early bird)
+        stats_df['hires/applies'] = stats_df['hires']/stats_df['applies'] # acceptentance rate (don't miss out!)
+        stats_df['neg_hires/applies'] = -stats_df['hires/applies'] # reverse acceptance rate (be the early bird)
         stats_df.replace([np.inf, -np.inf, np.nan], -1, inplace=True)
         
         self.ad_stats_df = stats_df
