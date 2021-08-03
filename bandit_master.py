@@ -30,7 +30,7 @@ class BanditMaster:
         self.feed_decisions_list = []
         self.feed_decisions_generator = None
         
-        #self.load_bandit_master_from_db()
+        self.load_bandit_master_from_db()
         self.generate_feed_decisions()
         
     #redundant function atm - ignore 
@@ -196,7 +196,7 @@ class StatsKeeper:
         
         #self.check_tables_exist()
         
-        #self.load_ad_stats_from_db() # populates self.ad_stats_df
+        self.load_ad_stats_from_db() # populates self.ad_stats_df
         self.analytics_backlog = [] 
         
 
