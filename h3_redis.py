@@ -113,7 +113,3 @@ class H3RedisWorker:
         self.load_edit_script()
         self.load_del_script()
 
-    
-        
-    
-    
