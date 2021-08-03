@@ -135,7 +135,7 @@ class BanditMaster:
 
             else:
 
-                saves_df = pd.read_sql_query('SELECT * FROM gig_advertisements_saves;', self.stats_keeper.remote_db_con, )
+                saves_df = pd.read_sql_query('SELECT * FROM gig_advertisement_saves;', self.stats_keeper.remote_db_con, )
                 applies_df = pd.read_sql_query('SELECT * FROM gig_applications;', self.stats_keeper.remote_db_con, )
                 hires_df = pd.read_sql_query('SELECT * FROM gig_hires;', self.stats_keeper.remote_db_con, )
             

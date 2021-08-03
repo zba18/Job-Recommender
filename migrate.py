@@ -65,7 +65,7 @@ if ad_stats_exists and feed_stats_exists:
 # Populate data
 
 # Begin by downloading data to populate ad_stats
-saves_df = pd.read_sql_query('SELECT * FROM gig_advertisements_saves;', stats_keeper.remote_db_con, )
+saves_df = pd.read_sql_query('SELECT * FROM gig_advertisement_saves;', stats_keeper.remote_db_con, )
 applies_df = pd.read_sql_query('SELECT * FROM gig_applications;', stats_keeper.remote_db_con, )
 hires_df = pd.read_sql_query('SELECT * FROM gig_hires;', stats_keeper.remote_db_con, ) ## add gig_past_hires
 
@@ -83,12 +83,12 @@ hires_counts_df = hires_df.pivot_table(index='gig_advertisement_id',values='user
 
 view_counts_df = pd.read_sql_query('SELECT id, view_count FROM gig_advertisements',  stats_keeper.remote_db_con, index_col='id') # in main, change id to gig_advertisement_id
 
-ads_lat_lng_df = pd.read_sql_query('SELECT id, latitude, longitude, FROM gig_advertisements',  stats_keeper.remote_db_con) 
+ads_lat_lng_df = pd.read_sql_query('SELECT id, latitude, longitude FROM gig_advertisements',  stats_keeper.remote_db_con) 
 
 ## all data is now downloaded. Proceed to populate the tables
 
 # populate redis.
-ads_lat_lng_df.apply(lambda row: h3worker.add_job( row['id'], (row['latitude'], row['longitude']) ) ) # will probaly fail if coords are null.
+ads_lat_lng_df.apply(lambda row: h3worker.add_job( row['id'], (row['latitude'], row['longitude']) ), axis = 1 ) # will probaly fail if coords are null.
 
 #merge data combined above into ad_stats_df
 stats_keeper.ad_stats_df = pd.DataFrame()
@@ -110,6 +110,7 @@ feed_names = ['all', 'view/impression', 'applies/impression','hired/applied'] # 
 initialized_feed_stats = { feed: {'impressions':0, 'applies':0, 'views':0, 'saves':0} for feed in feed_names }
 
 initialized_state = {'feeds': initialized_feed_stats , 'latest_records': latest_records }
+bandit_master.stats_keeper.local_db.execute('CREATE TABLE feed_stats(id PRIMARY KEY, time INTEGER, vals TEXT);')
 bandit_master.save_state_to_db()
 
 print("\nMigration Successful\n\n")
