@@ -150,7 +150,7 @@ class BanditMaster:
             hires_counts_df = hires_df.pivot_table(index='gig_advertisement_id',values='user_id', aggfunc='count',)
 
             # viewcount is a column in main db so it needs to be accessed directly 
-            view_counts_df = pd.read_sql_query('SELECT id, view_count FROM gig_advertisements', self.stats_keeper.remote_db_con, index_col='id') # in main, change id to gig_advertisement_id
+            view_counts_df = pd.read_sql_query('SELECT id, view_count FROM gig_advertisements', self.stats_keeper.remote_db_con, index_col='id') 
 
             ## all data is now downloaded. Proceed to update the table
 
@@ -211,7 +211,7 @@ class StatsKeeper:
         ##TO CHECK LATER: THAT INDEX OF AD_STATS matches job_id
         print(pd.read_sql_query('SELECT * FROM ad_stats', self.local_db))
         self.ad_stats_df = pd.read_sql_query('SELECT * FROM ad_stats', self.local_db,
-         index_col='index' 
+         index_col='id' 
         )
 
     def save_ad_stats_to_db(self):
