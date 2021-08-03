@@ -30,7 +30,7 @@ class BanditMaster:
         self.feed_decisions_list = []
         self.feed_decisions_generator = None
         
-        self.load_bandit_master_from_db()
+        #self.load_bandit_master_from_db()
         self.generate_feed_decisions()
         
     #redundant function atm - ignore 
@@ -122,7 +122,7 @@ class BanditMaster:
                 # for main db, modify these to WHERE id > latest instead of created_at >
                     'saves': text('SELECT user_id, gig_advertisement_id FROM gig_application_saves WHERE created_at > :latest').bindparams(latest= s ), #should be gig_advertisement_saves in maindb
                     'applies': text('SELECT user_id, gig_advertisement_id FROM gig_applications WHERE created_at > :latest').bindparams(latest= a ),
-                    'hires': text('SELECT user_id, gig_advertisement_id FROM gig_hires WHERE created_at > :latest').bindparams(latest= h ), 
+                    'hires': text('SELECT user_id, gig_advertisement_id FROM gig_hires WHERE created_at > :latest').bindparams(latest= h ),  ## add gig_past_hires
                 }
 
 
@@ -135,7 +135,7 @@ class BanditMaster:
 
             else:
 
-                saves_df = pd.read_sql_query('SELECT * FROM gig_saves;', self.stats_keeper.remote_db_con, )
+                saves_df = pd.read_sql_query('SELECT * FROM gig_advertisements_saves;', self.stats_keeper.remote_db_con, )
                 applies_df = pd.read_sql_query('SELECT * FROM gig_applications;', self.stats_keeper.remote_db_con, )
                 hires_df = pd.read_sql_query('SELECT * FROM gig_hires;', self.stats_keeper.remote_db_con, )
             
@@ -195,7 +195,8 @@ class StatsKeeper:
             self.remote_db_con = remote_db_eng       
         
         #self.check_tables_exist()
-        self.load_ad_stats_from_db() # populates self.ad_stats_df
+        
+        #self.load_ad_stats_from_db() # populates self.ad_stats_df
         self.analytics_backlog = [] 
         
 
@@ -203,7 +204,7 @@ class StatsKeeper:
         if self.local_db.execute("""SELECT name FROM sqlite_master WHERE type='table' AND name='ad_stats';""").fetchone():
             return
         else:
-            raise Exception(f"ad_stats does not exist in {self.local_db_path}")
+            raise FileNotFoundError(f"ad_stats does not exist in {self.local_db_path}")
         
     
     def load_ad_stats_from_db(self):

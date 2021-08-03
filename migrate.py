@@ -20,10 +20,12 @@ h3worker = H3RedisWorker(redis_con)
 db_url = ''
 db_port = 3306
 username = ''
+db_name = 'dev-adnexio'
+
 load_dotenv()
 password = os.getenv('STAGINGPASSWORD')
 
-main_api_db = sqlalchemy.create_engine( f'mysql://{username}:{password}@{db_url}:{db_port}' )
+main_api_db = sqlalchemy.create_engine( f'mysql://{username}:{password}@{db_url}:{db_port}/{db_name}' )
 
 stats_keeper = StatsKeeper(
     local_db_path = 'analytics.db', # this is SQLite
@@ -55,17 +57,17 @@ if ad_stats_exists and feed_stats_exists:
     else:
         stats_keeper.local_db.execute('DROP TABLE ad_stats')
         stats_keeper.local_db.execute('DROP TABLE feed_stats')
-else:
-    raise FileNotFoundError 
+#else:
+#    raise FileNotFoundError 
 
 
 
 # Populate data
 
 # Begin by downloading data to populate ad_stats
-saves_df = pd.read_sql_query('SELECT * FROM gig_saves;', stats_keeper.remote_db_con, )
+saves_df = pd.read_sql_query('SELECT * FROM gig_advertisements_saves;', stats_keeper.remote_db_con, )
 applies_df = pd.read_sql_query('SELECT * FROM gig_applications;', stats_keeper.remote_db_con, )
-hires_df = pd.read_sql_query('SELECT * FROM gig_hires;', stats_keeper.remote_db_con, )
+hires_df = pd.read_sql_query('SELECT * FROM gig_hires;', stats_keeper.remote_db_con, ) ## add gig_past_hires
 
 latest_records = {'saves':0, 'applies':0,'hires':0}
 try:
