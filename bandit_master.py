@@ -215,7 +215,7 @@ class StatsKeeper:
         )
 
     def save_ad_stats_to_db(self):
-        self.ad_stats_df.to_sql('ad_stats',self.local_db, index=True, if_exists = 'replace')
+        self.ad_stats_df.to_sql('ad_stats',self.local_db, index=True, if_exists = 'replace', index_label='id')
          # backups? how?
 
     def recompute_derived_stats(self):
