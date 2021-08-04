@@ -37,7 +37,9 @@ redis_con = redis.Redis('localhost') # make sure this is running, port default i
 
 h3worker = H3RedisWorker(redis_con)
 stats_keeper = StatsKeeper(local_db, main_api_db) # add main_api_db later. by default, uses 'fake_main_behaviors.db' file locally.
-bandit_master = BanditMaster(stats_keeper)
+bandit_master = BanditMaster(stats_keeper,
+# demo = False
+)
 
 '''
 @app.on_event("startup")
@@ -82,7 +84,6 @@ async def rec_feed(fjr : FindJobRequest):
 
 @app.post("/submit_analytics")
 async def receive_analytics(analytics_data: dict = Body(...)):
-#async def receive_analytics(analytics_req : AnalyticsRequest):
     bandit_master.stats_keeper.analytics_backlog.append(analytics_data)
 #    print(bandit_master.stats_keeper.analytics_backlog)
     return {"mesage": "Received"}

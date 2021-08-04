@@ -12,17 +12,17 @@ import traceback
 
 class BanditMaster:
            
-    def __init__(self, stats_keeper, demo = True):
+    def __init__(self, stats_keeper, demo = True, empty_db = False):
         self.stats_keeper = stats_keeper
         self.demo = demo
         #defaults - blank
-        self.bandit_master_state = {'feeds':  ## rename this?
+        self.bandit_master_state = {'feeds': 
             {
             'all':{'impressions':0, 'applies':0, 'views':0, 'saves':0},
             'click/impression':{'impressions':0, 'applies':0, 'views':0, 'saves':0},
             'applies/impression':{'impressions':0, 'applies':0, 'views':0, 'saves':0},
             'hired/applied':{'impressions':0, 'applies':0, 'views':0, 'saves':0},
-            #'3':{'impressions':0, 'applies':0, 'views':0, 'saves':0},   
+            #'new_feed':{'impressions':0, 'applies':0, 'views':0, 'saves':0},   
             },
             'latest_records':
                 {'saves':0, 'applies':0, 'hires':0}
@@ -30,6 +30,9 @@ class BanditMaster:
         self.feed_decisions_list = []
         self.feed_decisions_generator = None
         
+        if empty_db: # skip loading from DB, used for populating from scratch
+            return
+
         self.load_bandit_master_from_db()
         self.generate_feed_decisions()
         
@@ -196,7 +199,7 @@ class BanditMaster:
                 
 class StatsKeeper:
         
-    def __init__(self, local_db_path = 'analytics.db', remote_db_eng = 'fake_main_behaviors_new.db' ):
+    def __init__(self, local_db_path = 'analytics.db', remote_db_eng = 'fake_main_behaviors_new.db', empty_db = False ):
         self.local_db_path = local_db_path
         self.local_db = sqlalchemy.create_engine(f"sqlite:///{self.local_db_path}")  # backups?
         
@@ -206,8 +209,8 @@ class StatsKeeper:
         else:
             self.remote_db_con = remote_db_eng       
         
-        #self.check_tables_exist()
-        
+        if empty_db:
+            return
         self.load_ad_stats_from_db() # populates self.ad_stats_df
         self.analytics_backlog = [] 
         

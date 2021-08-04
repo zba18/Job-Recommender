@@ -29,10 +29,11 @@ main_api_db = sqlalchemy.create_engine( f'mysql://{username}:{password}@{db_url}
 
 stats_keeper = StatsKeeper(
     local_db_path = 'analytics.db', # this is SQLite
-    remote_db_eng = main_api_db
+    remote_db_eng = main_api_db,
+    empty_db = True
     )
 
-bandit_master = BanditMaster(stats_keeper)
+bandit_master = BanditMaster(stats_keeper, empty_db = True)
 
 
 
