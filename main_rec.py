@@ -1,6 +1,9 @@
 import redis
 from fastapi import FastAPI, HTTPException, Depends, Request, Body
 from typing import List
+from dotenv import load_dotenv
+import os
+import sqlalchemy
 
 import logging
 
@@ -17,14 +20,23 @@ app = FastAPI()
 
 local_db = 'analytics.db' 
 
-main_api_db = None
+# Connection to main db
+db_url = ''
+db_port = 3306
+username = ''
+db_name = 'dev-adnexio'
+
+load_dotenv()
+password = os.getenv('STAGINGPASSWORD')
+
+main_api_db = sqlalchemy.create_engine( f'mysql://{username}:{password}@{db_url}:{db_port}/{db_name}' )
 #connect to main_api_db here
 
 
 redis_con = redis.Redis('localhost') # make sure this is running, port default is 6379
 
 h3worker = H3RedisWorker(redis_con)
-stats_keeper = StatsKeeper(local_db) # add main_api_db later. by default, uses 'fake_main_behaviors.db' file locally.
+stats_keeper = StatsKeeper(local_db, main_api_db) # add main_api_db later. by default, uses 'fake_main_behaviors.db' file locally.
 bandit_master = BanditMaster(stats_keeper)
 
 '''

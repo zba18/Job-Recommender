@@ -89,7 +89,7 @@ class BanditMaster:
             print('Analytics processing...')
             if not self.stats_keeper.analytics_backlog:
                 print('Empty backlog')
-                
+                impressions_df = None
             # we track impressions (only), since views, saves, and applies are stored in the main behavior tables.
             # this is also only an approx. because impression tracking is currently only on app AFAIK.
             else:
@@ -117,30 +117,32 @@ class BanditMaster:
             if latest_retrieved_behaviors:
                 #one latest_record_id for each table: saves, applies, hires.
                 s, a, h = latest_retrieved_behaviors['saves'], latest_retrieved_behaviors['applies'], latest_retrieved_behaviors['hires']
-
+                
                 queries = { 
                 # for main db, modify these to WHERE id > latest instead of created_at >
-                    'saves': text('SELECT user_id, gig_advertisement_id FROM gig_application_saves WHERE created_at > :latest').bindparams(latest= s ), #should be gig_advertisement_saves in maindb
-                    'applies': text('SELECT user_id, gig_advertisement_id FROM gig_applications WHERE created_at > :latest').bindparams(latest= a ),
-                    'hires': text('SELECT user_id, gig_advertisement_id FROM gig_hires WHERE created_at > :latest').bindparams(latest= h ),  ## add gig_past_hires
+                    'saves': text('SELECT id, user_id, gig_advertisement_id FROM gig_advertisement_saves WHERE id > :latest').bindparams(latest= s ), #should be gig_advertisement_saves in maindb
+                    'applies': text('SELECT id, user_id, gig_advertisement_id FROM gig_applications WHERE id > :latest').bindparams(latest= a ),
+                    'hires': text('SELECT id, user_id, gig_advertisement_id FROM gig_hires WHERE id > :latest').bindparams(latest= h ),  ## add gig_past_hires
                 }
 
 
                 saves_df = pd.read_sql_query(queries['saves'], self.stats_keeper.remote_db_con,
-                # index_col='id' #dummy table has no id column, will automatically be added by pd. Otherwise, this line is needed. NO I DONT THINK SO ANYMORE.
+                 index_col='id' #dummy table has no id column, will automatically be added by pd. Otherwise, this line is needed. NO I DONT THINK SO ANYMORE.
                 ) 
-                applies_df = pd.read_sql_query(queries['applies'], self.stats_keeper.remote_db_con,) 
-                hires_df = pd.read_sql_query(queries['hires'], self.stats_keeper.remote_db_con, )
+                applies_df = pd.read_sql_query(queries['applies'], self.stats_keeper.remote_db_con, index_col='id') 
+                hires_df = pd.read_sql_query(queries['hires'], self.stats_keeper.remote_db_con, index_col='id')
                 
 
             else:
 
-                saves_df = pd.read_sql_query('SELECT * FROM gig_advertisement_saves;', self.stats_keeper.remote_db_con, )
-                applies_df = pd.read_sql_query('SELECT * FROM gig_applications;', self.stats_keeper.remote_db_con, )
-                hires_df = pd.read_sql_query('SELECT * FROM gig_hires;', self.stats_keeper.remote_db_con, )
-            
-            #update latest records
-            #self.bandit_master_state['latest_records'] = {'saves': saves_df.index[-1],'applies': applies_df.index[-1],'hires': hires_df.index[-1]}
+                saves_df = pd.read_sql_query('SELECT * FROM gig_advertisement_saves;', self.stats_keeper.remote_db_con, index_col='id')
+                applies_df = pd.read_sql_query('SELECT * FROM gig_applications;', self.stats_keeper.remote_db_con, index_col='id')
+                hires_df = pd.read_sql_query('SELECT * FROM gig_hires;', self.stats_keeper.remote_db_con, index_col='id')
+           
+            print("SAVES")
+            print(saves_df)
+            print("APPLIES")
+            print(applies_df)
             
             # When the format [ad_id, user_id], aggregating user_id in using count gives the number of times it was saved/applied/hired
             #PIVOT TABLE INDEX SHOULD BE ON INDEX
@@ -158,11 +160,21 @@ class BanditMaster:
             self.stats_keeper.ad_stats_df['views'] = view_counts_df['view_count'] 
             
             #merge data into ad_stats_df
-            self.stats_keeper.ad_stats_df['impressions'] = self.stats_keeper.ad_stats_df['impressions'].add(impressions_df, fill_value = 0).fillna(0).astype(np.int32)
-            self.stats_keeper.ad_stats_df['saves'] = self.stats_keeper.ad_stats_df['saves'].add(saves_counts_df['user_id'], fill_value = 0).fillna(0).astype(np.int32)
-            self.stats_keeper.ad_stats_df['applies'] = self.stats_keeper.ad_stats_df['applies'].add(applies_counts_df['user_id'], fill_value = 0).fillna(0).astype(np.int32)
-            self.stats_keeper.ad_stats_df['hires'] = self.stats_keeper.ad_stats_df['hires'].add(hires_counts_df['user_id'], fill_value = 0).fillna(0).astype(np.int32)
-            
+            if impressions_df is not None:
+                self.stats_keeper.ad_stats_df['impressions'] = self.stats_keeper.ad_stats_df['impressions'].add(impressions_df, fill_value = 0).fillna(0).astype(np.int32)
+            if not saves_counts_df.empty:
+                self.stats_keeper.ad_stats_df['saves'] = self.stats_keeper.ad_stats_df['saves'].add(saves_counts_df['user_id'], fill_value = 0).fillna(0).astype(np.int32)
+                self.bandit_master_state['latest_records']['saves'] = saves_df.index[-1]
+            if not applies_counts_df.empty:
+                self.stats_keeper.ad_stats_df['applies'] = self.stats_keeper.ad_stats_df['applies'].add(applies_counts_df['user_id'], fill_value = 0).fillna(0).astype(np.int32)
+                self.bandit_master_state['latest_records']['applies'] = applies_df.index[-1]
+            if not hires_counts_df.empty:
+                self.stats_keeper.ad_stats_df['hires'] = self.stats_keeper.ad_stats_df['hires'].add(hires_counts_df['user_id'], fill_value = 0).fillna(0).astype(np.int32)
+                self.bandit_master_state['latest_records']['hires'] = hires_df.index[-1]
+
+            # update latest records
+            # self.bandit_master_state['latest_records'] = {'saves': saves_df.index[-1],'applies': applies_df.index[-1],'hires': hires_df.index[-1]}
+
             self.stats_keeper.recompute_derived_stats()
             
             print(self.stats_keeper.ad_stats_df)
